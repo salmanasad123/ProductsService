@@ -3,9 +3,12 @@ package com.appsdeveloperblog.estore.ProductsService.query;
 import com.appsdeveloperblog.estore.ProductsService.core.data.ProductEntity;
 import com.appsdeveloperblog.estore.ProductsService.core.data.ProductsRepository;
 import com.appsdeveloperblog.estore.ProductsService.core.events.ProductCreatedEvent;
+import com.appsdeveloperblog.estore.core.events.ProductReserveEvent;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.messaging.interceptors.ExceptionHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -15,6 +18,8 @@ import org.springframework.stereotype.Component;
 @ProcessingGroup("product-group")
 public class ProductsEventHandler {
     private final ProductsRepository productsRepository;
+
+    private final Logger LOGGER = LoggerFactory.getLogger(ProductsEventHandler.class);
 
     @Autowired
     public ProductsEventHandler(ProductsRepository productsRepository) {
@@ -30,6 +35,20 @@ public class ProductsEventHandler {
         BeanUtils.copyProperties(productCreatedEvent, productEntity);
 
         productsRepository.save(productEntity);
+    }
+
+    // this method will be triggered when the productReserveEvent is published.
+    @EventHandler
+    public void on(ProductReserveEvent productReserveEvent) {
+
+        ProductEntity productEntity = productsRepository.findByProductId(productReserveEvent.getProductId());
+
+        productEntity.setQuantity(productEntity.getQuantity() - productReserveEvent.getQuantity());
+
+        productsRepository.save(productEntity);
+
+        LOGGER.info("ProductReserveEvent is called for productId: " + productReserveEvent.getProductId() +
+                " and orderId: " + productReserveEvent.getOrderId());
     }
 
     // if we need to roll back transactions and undo the changes made by the event handler methods (on method in
